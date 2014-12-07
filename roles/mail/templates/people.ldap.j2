@@ -1,0 +1,10 @@
+version = 3
+server_host = 127.0.0.1
+server_port = 389
+timeout = 60
+search_base = cn=Users,{{  samba_base_dn  }}
+query_filter = (|(mail=%s)(proxyAddresses=%s))
+result_attribute = sAMAccountName
+bind = yes
+bind_dn = cn=Administrator,cn=Users,{{  samba_base_dn  }}
+bind_pw = {{ samba_adminpass }}

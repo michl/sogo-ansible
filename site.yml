@@ -1,0 +1,38 @@
+- name: apply common configuration to all wheezy nodes
+  hosts: wheezy
+  user: root
+  sudo: no
+
+  roles:
+    - default
+
+- name: apply common configuration to all ubuntu nodes
+  hosts: ubuntu
+  user: aha-admin
+  sudo: yes
+
+  roles:
+    - ubuntu
+    - default
+
+- name: apply sogo-configuration to all sogo nodes
+  hosts: sogo-servers
+  user: aha-admin
+  sudo: yes
+
+  roles:
+    - mail
+    - apache
+    - postgresql
+    - sogo
+    - openchange
+    - zpush
+    - fetchmail
+
+- name: apply configuration to all openerp nodes
+  hosts: openerp-servers
+  user: aha-admin
+  sudo: yes
+  roles:
+    - postgresql
+    - openerp

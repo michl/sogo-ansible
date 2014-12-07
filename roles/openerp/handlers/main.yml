@@ -1,0 +1,2 @@
+- name: restart openerp
+  service: name=openerp-server state=restarted

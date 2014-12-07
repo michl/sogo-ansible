@@ -1,0 +1,28 @@
+apache_sites:
+  - default-ssl
+
+apache_modules:
+  - proxy
+  - proxy_http
+  - headers
+  - rewrite
+  - ssl
+  - wsgi
+
+apache_conf_modules:
+  - proxy
+  - ssl
+  - wsgi
+
+pg_logins:
+  - { type: 'local', database: 'all', user: 'postgres', address: '', method: 'peer' }
+  - { type: 'local', database: 'all', user: 'all', address: '', method: 'peer' }
+  - { type: 'host', database: 'all', user: 'all', address: '127.0.0.1/32', method: 'md5' }
+  - { type: 'host', database: 'all', user: 'all', address: '::1/128', method: 'md5' }
+  - { type: 'host', database: 'sogo', user: 'sogo', address: '172.0.0.1/32', method: 'md5' }
+  
+pg_users:
+  - { name: 'sogo', password: $pg_password_sogo, attributes: 'NOSUPERUSER,NOCREATEDB,NOCREATEROLE' }
+
+
+fetchmail_enabled: no

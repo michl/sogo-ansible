@@ -1,0 +1,78 @@
+#!/usr/bin/python
+"""sogo_user.
+
+Usage:
+  sogo_user list
+  sogo_user batch <file>
+  sogo_user repair
+  sogo_user del <username>
+  sogo_user add <username>
+  sogo_user -h | --help | --version
+  
+"""
+import yaml
+import ldap
+import subprocess
+from docopt import docopt
+
+arguments = docopt(__doc__, version='0.1')
+
+print arguments
+#dataMap = yaml.safe_load(args.user_file)
+#print dataMap
+
+sogo_host="mysogoserver.example.ch"
+sogo_base_dn="cn=Users,dc=mydom,dc=local";
+sogo_bind_dn="cn=Administrator,cn=Users,dc=mydom,dc=local";
+sogo_bind_pw="secret";
+searchScope = ldap.SCOPE_SUBTREE
+retrieveAttributes = None 
+
+class SogoUser:
+	''' Represents a user of the mail system '''
+	def
+	pass
+
+def getUsersFromLdap():
+	try:
+		l = ldap.open(sogo_host)
+		l.simple_bind(sogo_bind_dn, sogo_bind_pw)
+		results = l.search_s(sogo_base_dn, searchScope, '(&(objectClass=user)(mailNickname=*))')
+	except ldap.LDAPError, error_message:
+		print "Couldn't Connect. %s " % error_message
+	for result in results:
+		yield result[1]
+
+
+if arguments['list']:
+	for result in getUsersFromLdap():
+		print "\n\n\n"
+		for eins, zwei in result.items():
+			print "%s: %s" % (eins, zwei)
+	
+
+#f = open("user.yml")
+#dataMap = yaml.safe_load(f)
+#f.close()
+
+#for user in dataMap:
+#	print(user['username'])
+#	try:
+#		ldap_entry = l.search_s(sogo_base_dn, searchScope, "cn="+user['username'], retrieveAttributes)
+#		if len(ldap_entry) == 0:
+#			print "User %s does not exist" % user['username']
+#			subprocess.call(['/usr/bin/samba-tool', 'user', 'add', user['username'], user['password']])
+#		else:
+#			ldap_user = ldap_entry[0][1]
+#			if not ldap_user.has_key('mailNickname'):
+#				print "User %s is not a exchange user" % user['username']
+#				subprocess.call(['/usr/sbin/openchange_newuser', '--create', user['username']])
+#	except ldap.LDAPError, e:
+#		print(e)
+
+# 1. Get Users (von Kommandozeile, File, Webanfrage, ...)
+# 2. Per User:
+#   3. Check if exists -> create
+#   4. Check if openchange -> provision
+#   5. Check if ldap is consistent -> repair
+#   6. Update ldap with information

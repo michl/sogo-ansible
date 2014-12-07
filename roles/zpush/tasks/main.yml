@@ -1,0 +1,92 @@
+- name: Install needed packages
+  apt: pkg={{  item }} state=present
+  with_items:
+    - php5-curl
+    - php5-ldap
+    - php5-imap
+    - php-mail
+    - libawl-php
+    - git
+    - php-soap
+    - libapache2-mod-php5
+    - lighttpd
+    - php5-cgi
+  tags: zpush
+  
+- name: Disable lighttpd service
+  service: name=lighttpd state=stopped enabled=no
+  tags: zpush
+
+- name: Create directories
+  file: name={{  item  }} state=directory owner=www-data group=www-data
+  with_items:
+    - /srv/www
+    - /var/log/z-push
+    - /srv/z-push
+  tags: zpush
+  register: last_result
+
+- name: Create users state files
+  command: touch /srv/z-push/users
+  sudo_user: www-data
+  sudo: yes
+  tags: zpush
+  when: last_result.changed
+
+- name: Checkout latest php-push-contrib from github
+  git: repo=https://github.com/fmbiete/Z-Push-contrib/ dest=/home/aha-admin/php-push
+  tags: zpush
+  register: last_result
+
+- name: Copy new php-push to /srv/www/z-push
+  command: rsync -r --delete /home/aha-admin/php-push/ /srv/www/z-push/
+  tags: zpush
+  when: last_result.changed
+
+- name: Make shure z-push belongs to apache
+  file: name=/srv/www/z-push state=directory recurse=true owner=www-data group=www-data
+  tags: zpush
+
+- name: create symlinks to z-push executables
+  file: src=/srv/www/z-push/{{  item  }}.php dest=/usr/local/bin/{{  item  }} state=link
+  with_items:
+    - z-push-admin
+    - z-push-top
+  tags: zpush
+
+- name: Deploy config.php
+  template: src=config.php.j2 dest=/srv/www/z-push/config.php owner=www-data group=www-data
+  tags: zpush
+  
+- name: Deploy backend configs
+  template: src={{  item  }}_config.php.j2 dest=/srv/www/z-push/backend/{{  item  }}/config.php owner=www-data group=www-data
+  with_items:
+    - combined
+    - imap
+    - carddav
+    - searchldap
+    - caldav
+  tags: zpush
+
+- name: Copy patched imap.php
+  copy: src=imap.php dest=/srv/www/z-push/backend/imap.php owner=www-data group=www-data
+  tags: none
+
+- name: Configure php.ini (Ungut, regex muss angepasst werden)
+  ini_file: dest=/etc/php5/apache2/php.ini section={{  item.section  }} option={{ item.option }} value={{  item.value  }} state=present
+#  lineinfile: dest=/etc/php5/apache2/php.ini regexp=^{{  item.variable  }}.*$ line={{  item.variable  }}={{  item.value  }} state=present
+  with_items:
+    - { section: 'PHP', option: 'magic_quotes_gpc', value: 'off' }
+    - { section: 'PHP', option: 'register_globals', value: 'off' }
+    - { section: 'PHP', option: 'magic_quotes_runtime', value: 'off' }
+    - { section: 'PHP', option: 'short_open_tag', value: 'on' }
+    - { section: 'Date', option: 'date.timezone', value: '\"$timezone\"' }
+    - { section: '"mail function"', option: 'sendmail_path', value: '"/usr/sbin/sendmail -t -i -f$postmaster"' }
+    - { section: 'PHP', option: 'expose_php', value: 'off' }
+  tags:
+    - zpush
+
+- name: Configure apache
+  copy: src=apache_zpush.conf dest=/etc/apache2/conf.d/zpush.conf
+  tags: zpush
+  notify: restart apache

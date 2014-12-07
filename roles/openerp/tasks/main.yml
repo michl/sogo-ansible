@@ -1,0 +1,108 @@
+- name: Install needed Packages
+  apt: pkg={{  item  }} state=present
+  with_items:
+    - postgresql
+    - python-dateutil
+    - python-docutils
+    - python-feedparser
+    - python-gdata
+    - python-imaging
+    - python-jinja2
+    - python-ldap
+    - python-libxslt1
+    - python-lxml
+    - python-mako
+    - python-matplotlib
+    - python-mock
+    - python-openid
+    - python-psycopg2
+    - python-psutil
+    - python-pybabel
+    - python-pychart
+    - python-pydot
+    - python-pyparsing
+    - python-reportlab
+    - python-simplejson
+    - python-tz
+    - python-unittest2
+    - python-vatnumber
+    - python-vobject
+    - python-webdav
+    - python-werkzeug
+    - python-xlwt
+    - python-yaml
+    - python-zsi
+    - bzr
+#    - python-setuptools
+#    - python-babel
+#    - python-reportlab-accel
+#    - python-openssl
+#    - python-egenix-mxdatetime
+#    - python-unittest2
+#    - lptools
+#    - python-paramiko
+#    - poppler-utils
+#    - python-pdftools
+#    - antiword
+  tags: openerp
+
+- name: Create openerp group
+  group: name=openerp state=present 
+  tags: openerp
+
+- name: Create openerp user
+  user: name=openerp group=openerp home=/opt/openerp system=yes state=present
+  tags: openerp
+
+#- name: Create postgresql user
+#  sudo: yes
+#  sudo_user: postgres
+#  postgresql_user: user=openerp password={{  pg_password_openerp }} role_attr_flags=NOSUPERUSER,NOCREATEROLE,CREATEDB state=present
+#  tags: openerp
+
+- name: Create directories and set permissions
+  file: path={{ item }} state=directory owner=openerp group=openerp recurse=yes
+  with_items:
+    - /opt/openerp
+    - /opt/openerp/prod
+    - /var/log/openerp
+  tags: openerp
+
+- name: Clone launchpad repos for openerp
+  sudo_user: openerp
+  bzr: name=lp:{{  item  }}/7.0 dest=/opt/openerp/lp/{{  item  }}
+  with_items:
+    - openerp-web
+    - openobject-server
+    - openobject-addons
+  register: last_result
+  tags: openerp
+
+- name: Copy repos to /opt/openerp/prod
+  sudo_user: openerp
+  command: rsync -r --delete /opt/openerp/lp/{{  item.repo  }}/ /opt/openerp/prod/{{  item.path  }}/
+  with_items:
+    - { repo: 'openerp-web', path: 'web' }
+    - { repo: 'openobject-server', path: 'server' }
+    - { repo: 'openobject-addons', path: 'addons' }
+  tags: openerp
+  when: last_result.changed
+  notify: restart openerp
+
+- name: Deploy /etc/openerp-server.conf
+  template: src=openerp-server.conf.j2 dest=/etc/openerp-server.conf owner=openerp group=root mode=0640
+  tags: openerp
+  notify: restart openerp
+
+- name: Deploy init script
+  copy: src=initd_openerp-server dest=/etc/init.d/openerp-server owner=root group=root mode=0755
+  tags: openerp
+  
+- name: Enable services
+  service: name={{  item  }} state=started enabled=true
+  with_items:
+    - postgresql
+    - openerp-server
+  tags: openerp
+  
+    

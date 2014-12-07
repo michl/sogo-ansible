@@ -1,0 +1,9 @@
+- name: restart samba
+  service: name=samba4 state=restarted
+
+- name: restart postgresql
+  service: name=postgresql state=restarted
+
+- name: restart apache
+  service: name=apache2 state=restarted
+

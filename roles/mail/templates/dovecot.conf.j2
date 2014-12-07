@@ -1,0 +1,150 @@
+disable_plaintext_auth = yes
+log_path = /var/log/dovecot.message
+log_timestamp = \"%Y-%m-%d %H:%M:%S \"
+#auth_debug=yes
+#mail_debug=yes
+mail_location = maildir:/srv/dovecot/users/%u/mail:INDEX=/srv/fast/dovecot/users/%u/index:CONTROL=/srv/dovecot/users/%u/control
+first_valid_uid = 33
+mail_privileged_group = mail
+ssl = required
+ssl_cert = </etc/ssl/{{  ext_hostname  }}.crt
+ssl_key = </etc/ssl/{{  ext_hostname  }}.key
+ssl_ca = </etc/ssl/ca.crt
+passdb {
+  driver = passwd-file
+  args = /etc/dovecot/master-users
+  master = yes
+  pass = yes
+}
+passdb {
+  args = /etc/dovecot/dovecot-ldap.conf
+  driver = ldap
+}
+passdb {
+  driver = static
+  args = nopassword=y allow_nets=127.0.0.1/32
+}
+passdb {
+  driver = pam
+}
+protocols = imap pop3 sieve
+auth default {
+      mechanisms = plain login digest-md5 cram-md5 ntlm
+      passdb  {
+        args = /etc/dovecot/dovecot-ldap.conf
+        driver = ldap
+      }
+      userdb  {
+        args = /etc/dovecot/dovecot-ldap.conf
+        driver = ldap
+      }
+      socket listen {
+        client {
+          # Assuming the default Postfix $queue_directory setting
+          path = /var/spool/postfix/private/auth
+          mode = 0660
+          # Assuming the default Postfix user and group
+          user = postfix
+          group = postfix
+        }
+        # deliver and some other programs need also auth-master:
+        #master {
+        #  path = /var/run/dovecot/auth-master
+        #  mode = 0600
+        #}
+      }
+    }
+service auth {
+  unix_listener auth-master {
+    group = vmail
+    mode = 0600
+    user = vmail
+  }
+  unix_listener auth-userdb {
+    user = vmail
+  }
+  user = root
+}
+userdb {
+  args = /etc/dovecot/dovecot-ldap.conf
+  driver = ldap
+}
+userdb {
+  driver = passwd
+}
+protocol lda {
+  hostname = {{ int_hostname }}
+  log_path =
+  mail_plugins = sieve quota
+  postmaster_address = {{ postmaster }}
+}
+protocol imap {
+  mail_plugins = quota imap_quota imap_acl acl
+}
+protocol pop3 {
+  pop3_uidl_format = %08Xu%08Xv
+}
+managesieve_notify_capability = mailto
+managesieve_sieve_capability = fileinto reject envelope encoded-character vacation subaddress comparator-i;ascii-numeric relational regex imap4flags copy include variables body enotify environment mailbox date ihave
+service managesieve-login {
+  inet_listener sieve {
+    port = 4190
+  }
+  inet_listener sieve_deprecated {
+    port = 2000
+  }
+  service_count = 1
+}
+plugin {
+  sieve = /srv/dovecot/users/%u/sievefile
+  sieve_dir = /srv/dovecot/users/%u/sieve
+  quota = maildir
+  quota_rule2 = Trash:storage=+100M
+  quota_warning = storage=95%% quota-warning 95 %u
+  quota_warning2 = storage=80%% quota-warning 80 %u
+  quota_warning3 = -storage=80%% quota-warning below %u
+  acl_shared_dict = file:/srv/dovecot/shared-mailboxes.db
+  acl = vfile
+}
+service quota-warning {
+  executable = script /usr/local/bin/quota-warning.sh
+  user = vmail
+  unix_listener quota-warning {
+    user = vmail
+  }
+}
+namespace {
+  type = private
+  separator = /
+  prefix =
+  inbox = yes
+}
+namespace {
+  type = shared
+  separator = /
+  prefix = shared/%%u/
+  location = maildir:/srv/dovecot/users/%%u/mail:INDEX=/srv/fast/dovecot/users/%u/shared-index/%%u:CONTROL=/srv/dovecot/users/%%u/control
+  list = children
+}
+#auth default {
+#  mechanisms = plain login
+#  passdb pam {
+#  }
+#    userdb passwd {
+#  }
+#  socket listen {
+#    client {
+#      # Assuming the default Postfix $queue_directory setting
+#      path = /var/spool/postfix/private/auth
+#      mode = 0660
+#      # Assuming the default Postfix user and group
+#      user = postfix
+#      group = postfix
+#    }
+#  # deliver and some other programs need also auth-master:
+#  #master {
+#  #  path = /var/run/dovecot/auth-master
+#  #  mode = 0600
+#  #}
+#  }
+#}

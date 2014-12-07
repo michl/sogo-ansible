@@ -1,0 +1,68 @@
+- name: Install Open Change packages
+  apt: name={{ item }} state=present
+  with_items:
+    - samba4
+    - openchangeserver
+    - sogo-openchange
+    - openchangeproxy
+    - openchange-ocsmanager
+    - openchange-rpcproxy
+    - heimdal-clients
+
+- name: Uninstall bind9 package
+  apt: name=bind9 state=absent purge=yes
+
+- name: Delete smb.conf
+  file: path=/etc/samba/smb.conf state=absent
+  when: provision is defined
+
+- name: Delete Samba4-Data
+  file: path=/var/lib/samba state=absent
+  when: provision is defined
+  tags: openchange
+
+- name: Make Samba4-Data
+  file: path=/var/lib/samba state=directory owner=root group=root
+  when: provision is defined
+  tags: openchange
+
+- name: Provision Samba
+  command: samba-tool domain provision --realm={{ samba_realm }} --domain={{ samba_domain }} --adminpass={{ samba_adminpass }} --server-role=dc creates=/etc/samba/smb.conf
+
+- name: Configure Samba
+  template: src=smb.conf.j2 dest=/etc/samba/smb.conf
+  notify:
+    - restart samba
+ 
+- name: Configure Kerberos Client
+  template: src=krb5.conf.j2 dest=/etc/krb5.conf
+    
+#- name: Delete krb5.conf
+#  file: path=/etc/krb5.conf state=absent
+#  when: provision is defined
+
+#- name: Copy kerberos configuration
+#  command: cp /var/lib/samba/private/krb5.conf /etc/krb5.conf creates=/etc/krb5.conf
+
+- name: Provision OpenChange
+  command: openchange_provision
+  when: provision is defined
+
+- name: Create OpenChange database
+  command: openchange_provision --openchangedb
+  notify:
+    - restart openchange
+  when: provision is defined
+
+- name: Activate local dns
+  template: src=resolvconf_base.j2 dest=/etc/resolvconf/resolv.conf.d/base
+  tags: samba
+  
+#- name: Wait for Samba4-LDAP to get ready.
+#  wait_for: port=389 timeout=600 sate=started host=localhost
+
+#- name: Build ldif for Administrator
+#  template: src=administrator.ldif.j2 dest=/tmp/administrator.ldif
+  
+#- name: RUn ldif for Administrator
+#  command: 

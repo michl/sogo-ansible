@@ -1,0 +1,16 @@
+set daemon 10
+set syslog
+set postmaster {{  postmaster  }}
+set no bouncemail
+poll {{  fetchmail_imaphost  }}
+  localdomains {{  postfix_virtual_domains|join(' ')  }}
+  proto imap
+  service {{  fetchmail_imapport  }}
+  envelope "X-Original-To:"
+  user '{{  fetchmail_imapuser  }}' password "{{  fetchmail_imappass  }}" to *
+  idle
+  fetchall
+  ssl
+  sslcertck
+  sslproto tls1
+  sslcertpath /etc/ssl/certs

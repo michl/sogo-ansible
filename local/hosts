@@ -1,0 +1,9 @@
+[sogo-servers]
+mysogoserver
+
+[ubuntu]
+mysogoserver
+myopenerpserver
+
+[openerp-servers]
+myopenerpserver

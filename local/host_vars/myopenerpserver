@@ -1,0 +1,3 @@
+openerp_adminpass: secret
+pg_users:
+  - { name: 'openerp', password: 'secret', attributes: 'NOSUPERUSER,CREATEDB,NOCREATEROLE' }

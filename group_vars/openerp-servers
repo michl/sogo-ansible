@@ -1,0 +1,5 @@
+pg_host: False
+pg_port: False
+pg_users:
+  - { name: 'openerp', password: 'openerp', attributes: 'NOSUPERUSER,CREATEDB,NOCREATEROLE' }
+openerp_adminpass: admin

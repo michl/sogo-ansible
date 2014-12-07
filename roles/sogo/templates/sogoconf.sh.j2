@@ -1,0 +1,35 @@
+sudo -u sogo defaults write sogod SOGoTimeZone "{{ timezone }}"
+sudo -u sogo defaults write sogod SOGoProfileURL "postgresql://sogo:{{ pg_password_sogo }}@localhost:5432/sogo/sogo_user_profile"
+sudo -u sogo defaults write sogod OCSFolderInfoURL "postgresql://sogo:{{ pg_password_sogo }}@localhost:5432/sogo/sogo_folder_info"
+sudo -u sogo defaults write sogod OCSSessionsFolderURL "postgresql://sogo:{{ pg_password_sogo }}@localhost:5432/sogo/sogo_sessions_folder"
+sudo -u sogo defaults write sogod OCSEMailAlarmsFolderURL "postgresql://sogo:{{ pg_password_sogo }}@localhost:5432/sogo/sogo_alarms_folder"
+sudo -u sogo defaults write sogod SOGoUserSources '({CNFieldName = displayName; IDFieldName = cn; UIDFieldName = sAMAccountName; baseDN = "'"cn=Users,{{  samba_base_dn }}"'"; bindDN = "'"cn=Administrator,cn=Users,{{ samba_base_dn }}"'"; bindPassword = '{{  samba_adminpass  }}'; canAuthenticate = YES; displayName = "Shared Addresses"; hostname = "127.0.0.1"; id = samba; isAddressBook = YES; port = 389; })'
+sudo -u sogo defaults write sogod SOGoMailDomain "{{ sogo_mail_domain }}"
+sudo -u sogo defaults write sogod SOGoIMAPAclConformsToIMAPExt YES
+sudo -u sogo defaults write sogod SOGoLanguage German
+sudo -u sogo defaults write sogod SOGoAppointmentSendEMailNotifications YES
+sudo -u sogo defaults write sogod SOGoFoldersSendEMailNotifications YES
+sudo -u sogo defaults write sogod SOGoACLsSendEMailNotifications YES
+sudo -u sogo defaults write sogod SOGoEnableEMailAlarms YES
+sudo -u sogo defaults write sogod WOWorkersCount 3
+sudo -u sogo defaults write sogod SOGoCalendarDefaultRoles '(ObjectCreator, PublicViewer, ConfidentialDAndTViewer)'
+sudo -u sogo defaults write sogod SOGoContactsDefaultRoles '(ObjectEditor)'
+sudo -u sogo defaults write sogod SOGoSuperUsernames '( 'Administrator' )'
+sudo -u sogo defaults write sogod SOGoSupportedLanguages '( German, English )'
+sudo -u sogo defaults write sogod SOGoHideSystemEMail YES
+sudo -u sogo defaults write sogod MailFieldNames '(mail, otherMailbox)'
+sudo -u sogo defaults write sogod SOGoSearchMinimumWordLength 0
+sudo -u sogo defaults write sogod SOGoMailingMechanism smtp
+sudo -u sogo defaults write sogod SOGoSMTPServer localhost
+sudo -u sogo defaults write sogod SOGoPageTitle "{{  sogo_webpage_title  }}"
+sudo -u sogo defaults write sogod SOGoLoginModule Mail
+sudo -u sogo defaults write sogod SOGoMailMessageCheck every_minute
+sudo -u sogo defaults write sogod SOGoFirstDayOfWeek 1
+sudo -u sogo defaults write sogod SOGoFirstWeekOfYear First4DayWeek
+sudo -u sogo defaults write sogod SOGoMailSignaturePlacement above
+sudo -u sogo defaults write sogod SOGoMailComposeMessageType text
+sudo -u sogo defaults write sogod SOGoSieveServer 'sieve://127.0.0.1:2000'
+sudo -u sogo defaults write sogod SOGoVacationEnabled YES
+sudo -u sogo defaults write sogod SOGoForwardEnabled YES
+sudo -u sogo defaults write sogod SOGoSieveScriptsEnabled YES
+sudo -u sogo sogo-tool dump-defaults > /etc/sogo/sogo.conf

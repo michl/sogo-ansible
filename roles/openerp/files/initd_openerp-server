@@ -1,0 +1,64 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:		openerp-server
+# Required-Start:	$remote_fs $syslog
+# Required-Stop:	$remote_fs $syslog
+# Should-Start:		$network
+# Should-Stop:		$network
+# Default-Start:	2 3 4 5
+# Default-Stop:		0 1 6
+# Short-Description:	Enterprise Resource Management software
+# Description:		Open ERP is a complete ERP and CRM software.
+### END INIT INFO
+
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+
+. /lib/lsb/init-functions
+
+DAEMON=/opt/openerp/prod/server/openerp-server
+NAME=openerp-server
+DESC=openerp-server
+CONFIG=/etc/openerp-server.conf
+LOGFILE=/var/log/openerp/openerp-server.log
+RUNASUSER=openerp
+PIDFILE=/var/run/openerp-server.pid
+
+test -x ${DAEMON} || exit 5
+
+UGID=$(getent passwd $RUNASUSER | cut -f 3,4 -d:) || true
+
+#set -e
+
+case "${1}" in
+    start)
+	log_daemon_msg "Starting  $DESC" "openerp"
+	if [ -z "$UGID" ]; then
+        	log_failure_msg "user \"$RUNASUSER\" does not exist"
+                exit 1
+	fi
+        start-stop-daemon --start --quiet --oknodo --pidfile $PIDFILE --chuid $RUNASUSER --background --make-pidfile --exec ${DAEMON} -- --config=${CONFIG} --logfile=${LOGFILE}
+        log_end_msg $?
+        ;;
+
+    stop)
+	log_daemon_msg "Stopping $DESC" "openerp"
+	start-stop-daemon --stop --quiet --pidfile $PIDFILE --oknodo
+	rm -f $PIDFILE
+	log_end_msg $?
+        ;;
+
+    restart|force-reload)
+	$0 stop && sleep 2 && $0 start
+        ;;
+    status)
+	status_of_proc $DAEMON "OpenERP"
+        ;;
+    *)
+        N=/etc/init.d/${NAME}
+        echo "Usage: ${NAME} {start|stop|restart|status}" >&2
+        exit 1
+        ;;
+esac
+
+exit 0

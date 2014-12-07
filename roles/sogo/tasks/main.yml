@@ -1,0 +1,103 @@
+- name: Install inverse repo
+  apt_repository: repo="deb http://inverse.ca/ubuntu precise precise" state=present
+  tags: sogo
+
+- name: Install inverse repo key
+  apt_key: state=present data="{{ lookup('file', '../files/inverse.gpg') }}"
+  tags: sogo
+
+- name: Perform apt update
+  apt: update_cache=yes
+  tags: sogo
+
+- name: Install sogo packages
+  apt: name={{ item }} state=present
+  with_items:
+    - links
+    - bsdmainutils
+    - apache2-mpm-prefork
+    - apache2-utils
+    - arj
+    - ldap-utils
+    - maildrop
+    - memcached
+    - nmap
+    - p7zip
+    - p7zip-full
+    - p7zip-rar
+    - psmisc
+    - rar
+    - unace
+    - unzip
+    - w3m
+    - zip
+    - recode
+    - sogo
+    - sope4.9-gdl1-postgresql
+    - python-psycopg2
+    - python-yaml
+    - python-ldap
+    - python-pip
+  tags:
+    - sogo
+
+- name: Install pip-Packages
+  pip: name={{  item  }} state=present
+  with_items:
+    - docopt
+    - termcolor
+  tags: sogo
+    
+- name: Create postgresql database
+  sudo: yes
+  sudo_user: postgres
+  postgresql_db: name=sogo owner=sogo state=present
+  tags: sogo
+  
+- name: Create sogo config script
+  template: src=sogoconf.sh.j2 dest=/root/sogoconf.sh
+  tags: sogo
+  register: result
+  
+- name: Make sogo config script read protected
+  file: path=/root/sogoconf.sh mode=700
+  tags: sogo
+
+- name: Run sogo config script
+  command: sh /root/sogoconf.sh
+  when: result.changed
+  tags: sogo
+  
+- name: Delete GNUStep-Env for root
+  file: path=/root/GNUstep state=absent
+  tags: sogo
+  when: provision is defined
+
+- name: Link GNUStep between sogo and root
+  file: src=~sogo/GNUstep dest=/root/GNUstep state=link force=yes
+  tags: sogo
+  
+- name: Install sogo cronjobs
+  template: src=cron.j2 dest=/etc/cron.d/sogo
+  tags: sogo
+  
+- name: Configure apache
+  template: src=apache_sogo.conf.j2 dest=/etc/apache2/conf.d/SOGo.conf
+  tags: sogo
+  notify:
+    - restart apache
+
+- name: Restart sogo and memcached
+  service: name={{ item }} state=restarted
+  with_items:
+    - sogo
+    - memcached
+  tags: sogo
+
+- name: Copy user file
+  copy: src=./$inventory_hostname/user.yml dest=/root/ mode=600
+  tags: sogo
+
+- name: Copy aha_user
+  template: src=aha_user.j2 dest=/usr/bin/aha_user mode=755
+  tags: testing

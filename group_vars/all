@@ -1,0 +1,15 @@
+ntpserver1: 0.ch.pool.ntp.org
+ntpserver2: 1.ch.pool.ntp.org
+
+timezone: Europe/Zurich
+locale: de_CH.UTF-8
+
+ansible_path: /home/mvolz/aha/projekte/sogo/ansible
+
+pg_host: localhost
+pg_port: 5432
+pg_logins:
+  - { type: 'local', database: 'all', user: 'postgres', address: '', method: 'peer' }
+  - { type: 'local', database: 'all', user: 'all', address: '', method: 'peer' }
+  - { type: 'host', database: 'all', user: 'all', address: '127.0.0.1/32', method: 'md5' }
+  - { type: 'host', database: 'all', user: 'all', address: '::1/128', method: 'md5' }

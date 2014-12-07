@@ -1,0 +1,5 @@
+ldap_servers: ldap://127.0.0.1/
+ldap_search_base: cn=Users,{{  samba_base_dn }}
+ldap_bind_dn: cn=Administrator,cn=Users,{{  samba_base_dn  }}
+ldap_bind_pw: {{  samba_adminpass  }}
+ldap_filter: (mailNickname=%u)

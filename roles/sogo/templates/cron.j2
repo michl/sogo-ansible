@@ -1,0 +1,20 @@
+# Sogod cronjobs
+
+# Vacation messages expiration
+# The credentials file should contain the sieve admin credentials (username:passwd)
+0 0 * * *      sogo	/usr/sbin/sogo-tool expire-autoreply -p /etc/dovecot/master-users
+
+# Session cleanup - runs every minute
+#   - Ajust the nbMinutes parameter to suit your needs
+# Example: Sessions without activity since 60 minutes will be dropped:
+#* * * * *      sogo	/usr/sbin/sogo-tool expire-sessions 60
+
+# Email alarms - runs every minutes
+#* * * * *      sogo	/usr/sbin/sogo-ealarms-notify
+
+# Daily backups
+#   - writes to /home/sogo/backups/ by default
+#   - will keep 31 days worth of backups by default
+#   - runs once a day by default, but can run more frequently
+#   - make sure to set the path to sogo-backup.sh correctly
+#30 0 * * *     sogo   /usr/share/doc/sogo/sogo-backup.sh

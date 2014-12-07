@@ -1,0 +1,3 @@
+{% for clientauth in pg_clienauths %}
+{{ clientauth.type }}	{{ clientauth.database }}	{{ clientauth.user }}	{{ clientauth.address }}	{{ clientauth.method }}
+{% endfor %}

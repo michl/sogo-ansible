@@ -1,0 +1,18 @@
+- username: user1
+  firstname: Some
+  lastname: User
+  email: some.user@example.ch
+  addresses:
+    - suser@example.ch
+    - user1@mydom.local
+  password: secret
+  
+- username: user2
+  firstname: Another
+  lastname: User
+  email: another.user@example.ch
+  addresses:
+    - auser@example.ch
+    - user2@mydom.local
+  password: secret
+  

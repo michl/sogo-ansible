@@ -1,0 +1,454 @@
+#!/usr/bin/python
+"""aha_user.
+
+Usage:
+  aha_user list
+  aha_user batch <file>
+  aha_user batch_import <file> <folder>
+  aha_user check
+  aha_user repair <username>
+  aha_user delete <username>
+  aha_user add <username>
+  aha_user show <username>
+  aha_user del_mail <username> <mail>
+  aha_user add_mail <username>
+  aha_user add_mail <username> <mail>
+  aha_user main_mail <username> <mail>
+  aha_user -h | --help | --version
+  
+"""
+import yaml
+import ldap
+import ldap.modlist
+import subprocess
+import re
+from docopt import docopt
+import datetime
+import sys
+import copy
+import os.path
+
+arguments = docopt(__doc__, version='0.1')
+
+#print arguments
+#dataMap = yaml.safe_load(args.user_file)
+#print dataMap
+
+sogo_host="{{  ext_hostname  }}"
+sogo_base_dn="cn=Users,{{  samba_base_dn  }}";
+sogo_bind_dn="cn=Administrator,cn=Users,{{  samba_base_dn  }}";
+sogo_bind_pw="{{  samba_adminpass  }}";
+
+retrieveAttributes = None 
+
+re_addresses = re.compile('^smtp:(.*)$')
+re_main_address = re.compile('^SMTP:(.*)$')
+re_group = re.compile('^CN=(.*),CN=.*')
+
+class aha_user_source:
+	''' Represents the user database of the mail system. Handles ldap tasks'''
+
+	def __init__(self, host, base_dn, bind_dn, bind_pw):
+		self._host = host
+		self._base_dn = base_dn
+		self._bind_dn = bind_dn
+		self._bind_pw = bind_pw
+		self._searchScope = ldap.SCOPE_SUBTREE
+		try:
+			self._ldap = ldap.open(self._host)
+			self._ldap.simple_bind(self._bind_dn, self._bind_pw)
+		except ldap.LDAPError, error_message:
+			print "Couldn't Connect. %s " % error_message
+		
+	def get_users(self):
+		if not self._usernames_are_unique():
+			raise Exception("Usernames are not unique")
+		try:
+			results = self._ldap.search_s(self._base_dn, self._searchScope, '(&(objectClass=user)(mailNickname=*))')
+		except ldap.LDAPError, error_message:
+			print "Could not search ldap. %s " % error_message
+		users = []
+		for dn,entry in results:
+			user = aha_user(dn, entry, self)
+			users.append(user)
+		return users
+		
+	def get_user(self, username):
+		if not self._usernames_are_unique():
+			raise Exception("Usernames are not unique")
+		try:
+			results = self._ldap.search_s(self._base_dn, self._searchScope, '(&(objectClass=user)(mailNickname={0}))'.format(username))
+		except ldap.LDAPError, error_message:
+			print "Could not search ldap. %s " % error_message
+		if len(results) <> 1:
+			print "User not found"
+			return None
+		else:
+			return aha_user(results[0][0], results[0][1], self)		
+		
+	def add_user(self, username, password, main_mail, first_name, last_name, additional_mail=[]):
+		if subprocess.call(['sudo', 'samba-tool', 'user', 'add', username, password]) == 0:
+			if subprocess.call(['sudo', 'openchange_newuser', '--create', username]) == 0:
+				new_user=self.get_user(username)
+				new_user.set_firstname(first_name)
+				new_user.set_lastname(last_name)
+				new_user.set_displayname("{0} {1}".format(first_name, last_name))
+				new_user.set_mail_address(main_mail)
+				new_user.set_mail_addresses(additional_mail)
+				new_user.update()
+				return True
+		return False
+		
+	def update_user(self, username, user):
+		if not self._usernames_are_unique():
+			return False
+		old_user = self.get_user(username)
+		modlist = ldap.modlist.modifyModlist(old_user._entry, user._entry)
+		self._ldap.modify_s(user.dn(), modlist)
+		
+		
+	def delete_user(self, username):
+		if not self._usernames_are_unique():
+			return False
+		if subprocess.call(['sudo', 'samba-tool', 'user', 'delete', username], shell=False) == 0:
+			return True
+		else:
+			return False
+		
+	def _usernames_are_unique(self):
+		try:
+			results = self._ldap.search_s(self._base_dn, self._searchScope, '(objectClass=user)')
+		except ldap.LDAPError, error_message:
+			print "Could not search ldap. %s " % error_message
+			sys.exit(1)
+		mailnicknames, samaccountnames = [], []
+		for dn,entry in results:
+			try:
+				mailnickname = entry['mailNickname'][0]
+			except:
+				mailnickname = ''
+			if (mailnickname <> '') and (mailnickname in mailnicknames):
+				return False
+			elif (mailnickname <> ''):
+				mailnicknames.append(mailnickname)
+			if entry['sAMAccountName'][0] in samaccountnames:
+				return False
+			else:
+				samaccountnames.append(entry['sAMAccountName'][0])
+		return True
+	pass
+
+class aha_user:
+	''' Represents a user of the mail system '''
+	
+	def __init__(self, dn, entry, user_source):
+		self._dn = dn
+		self._entry = entry
+		self._user_source = user_source
+		
+	def username(self):
+		return self._entry['sAMAccountName'][0]
+		
+	def firstname(self):
+		try:
+			return self._entry['givenName'][0]
+		except KeyError:
+			return None
+			
+	def lastname(self):
+		try:
+			return self._entry['sn'][0]
+		except KeyError:
+			return None
+			
+	def displayname(self):
+		try:
+			return self._entry['displayName'][0]
+		except KeyError:
+			return None
+			
+	def set_displayname(self, display_name):
+		self._entry['displayName'] = [display_name]
+			
+	def set_firstname(self, first_name):
+		self._entry['givenName'] = [first_name]
+			
+	def set_lastname(self, last_name):
+		self._entry['sn'] = [last_name]
+			
+	def set_mail_address(self, mail_address):
+		self._entry['mail'][0] = mail_address
+		for address in self._entry['proxyAddresses']:
+			if re_main_address.search(address) is not None:
+				self._entry['proxyAddresses'].remove(address)
+		new_proxy = "SMTP:{0}".format(mail_address)
+		self._entry['proxyAddresses'].append(new_proxy)
+			
+	def set_mail_addresses(self, mail_addresses):
+		for address in self._entry['proxyAddresses']:
+			if re_addresses.search(address) is not None:
+				self._entry['proxyAddresses'].remove(address)
+		if mail_addresses is not None:
+			for new_entry in mail_addresses:
+				new_proxy = "smtp:{0}".format(new_entry)
+				self._entry['proxyAddresses'].append(new_proxy)
+			
+	def mail_address(self):
+		try:
+			return self._entry['mail'][0]
+		except KeyError:
+			return None
+			
+	def mail_addresses(self):
+		addresses = []
+		try:
+			for address in self._entry['proxyAddresses']:
+				match = re_addresses.match(address)
+				if match is not None:
+					addresses.append(match.group(1))
+		except KeyError:
+			pass
+		return addresses
+			
+	def groups(self):
+		try:
+			for group in self._entry['memberOf']:
+				match = re_group.match(group)
+				if match is not None:
+					yield match.group(1)
+		except KeyError:
+			yield None
+			
+	def expires(self):
+		try:
+			ms_epoche = long(self._entry['accountExpires'][0])
+			if (ms_epoche == 0) or (ms_epoche == 0x7FFFFFFFFFFFFFFF):
+				return None
+			since_unix_epoche = ((ms_epoche - 116444736000000000L)/10000000)
+			expire_date = datetime.datetime.fromtimestamp(since_unix_epoche)
+			return expire_date
+		except KeyError:
+			return None
+			
+	def dn(self):
+		return self._dn
+		
+	def _get_main_addresses(self):
+		main_addresses = []
+		try:
+			proxy_addresses = self._entry['proxyAddresses']
+		except KeyError:
+			return []
+		for address in proxy_addresses:
+			match = re_main_address.match(address)
+			if match is not None:
+				main_addresses.append(match.group(1))
+		return main_addresses
+		
+	def repair(self):
+		main_addresses = self._get_main_addresses()
+		if (len(main_addresses) > 1):
+			print "User %s has too many SMTP proxyAddresses defined:" % self.username()
+			for addr in main_addresses:
+				print "  %s" & addr
+		elif (len(main_addresses) < 1):
+			print "User %s has noSMTP proxyAddresse defined." % self.username()
+		elif (self._entry['mail'][0] <> main_addresses[0]):
+			print "User %s's main address (%s) and SMTP proxyAddress (%s) don't match." % (self.username(), self.mail_address(), main_addresses[0])			
+		else:
+			return
+		new_mail = raw_input('Enter new main address: ')
+		new_entry = copy.deepcopy(self._entry)
+		new_entry['mail'][0] = new_mail
+		for address in new_entry['proxyAddresses']:
+			if re_main_address.search(address) is not None:
+				new_entry['proxyAddresses'].remove(address)
+		new_proxy = "SMTP:{0}".format(new_mail)
+		new_entry['proxyAddresses'].append(new_proxy)
+		print "\n\n\nNew Entry:\n"
+		print new_entry
+		print "\n\n\nOld Entry:\n"
+		print self._entry
+		return
+		
+	def update(self):
+		self._user_source.update_user(self.username(), self)
+		
+	def check(self):
+		errors = []
+		main_addresses = self._get_main_addresses()
+		if (len(main_addresses) < 1):
+			errors.append('No main proxyAddress')
+		elif (len(main_addresses) > 1):
+			errors.append('More than one proxyAddress')
+		elif self.mail_address() <> main_addresses[0]:
+			errors.append('Main proxyAddress does not match main mail address')
+		try:
+			mailnickname = self._entry['mailNickname']
+		except KeyError:
+			errors.append('No mailNickname defined')
+			mailnickname = ''
+		try:
+			samaccountname = self._entry['sAMAccountName']
+		except KeyError:
+			errors.append('No sAMAccountName definied')	
+			samaccountname = ''
+		if mailnickname <> samaccountname:
+			errors.append('mailNickname does not match sAMAccountName')
+		if (self.expires() is not None):
+			if (self.expires() < datetime.datetime.now()):
+				errors.append('Password has expired')
+		return errors
+		
+	pass
+
+my_user_source = aha_user_source(sogo_host, sogo_base_dn, sogo_bind_dn, sogo_bind_pw)
+
+if arguments['list']:
+	users =  my_user_source.get_users()
+	for user in users:
+		print "%s: %s <%s> (%s)" % (user.username(), user.displayname(), user.mail_address(), user.dn())
+		
+elif arguments['show']:
+	user = my_user_source.get_user(arguments['<username>'])
+	if user is not None:
+		print "dn: %s" % user.dn()
+		print "Username: %s" % user.username()
+		print "Vorname: %s" % user.firstname()
+		print "Nachname: %s" % user.lastname()
+		print "Angezeigter Name: %s" % user.displayname()
+		print "Haupt-Mailadresse: %s" % user.mail_address()
+		print "Zusaetzliche Mailadressen:"
+		for mail in user.mail_addresses():
+			print "  %s" % mail
+		print "Gruppen:"
+		for group in user.groups():
+			print "  %s" % group
+		print "Ablaufdatum Passwort: %s" % user.expires()
+	else:
+		print "User %s not found." % arguments['<username>']
+
+elif arguments['check']:
+	users = my_user_source.get_users()
+	all_good = True
+	for user in users:
+		errors = user.check()
+		if len(errors) == 0:
+			print "Checking user %s: Okay." % user.username()
+		else:
+			for error in errors:
+				print "Checking user %s: %s." % (user.username(), error)
+			all_good = False
+	if all_good:
+		print "Alle User sind okay."
+	else:
+		print "Es bestehen Fehler."
+
+elif arguments['delete']:
+	if my_user_source.delete_user(arguments['<username>']):
+		print "User %s deleted." % arguments['<username>']
+	else:
+		print "Cannot delete user %s." % arguments['<username>']	
+
+elif arguments['add']:
+	username = arguments['<username>']
+	password = raw_input('Password: ')
+	first_name = raw_input('First name: ')
+	last_name = raw_input('Last name: ')
+	main_mail = raw_input('Main mail address: ')
+	mail_addresses = []
+	mail_address = raw_input('Additional mail address (leave empty for none): ')
+	while mail_address <> '':
+		mail_addresses.append(mail_address)
+		mail_address = raw_input('Additional mail address (leave empty for none): ')
+	my_user_source.add_user(username, password, main_mail, first_name, last_name, mail_addresses)
+	
+	
+elif arguments['del_mail']:
+	user = my_user_source.get_user(arguments['<username>'])
+	if len(user.check()) <> 0:
+		print "There are errors with this user. Please repair first."
+		sys.exit(1)
+	mail_for_deletion = arguments['<mail>']
+	main_mail_address = user.mail_address()
+	mail_addresses = user.mail_addresses()
+	if mail_for_deletion == main_mail_address:
+		print "About to delete main mail address."
+		new_main_mail_address = raw_input("Enter new main address: ")
+		if new_main_mail_address in mail_addresses:
+			mail_addresses.remove(new_main_mail_address)
+		user.set_mail_address(new_main_mail_address)
+	else:
+		if mail_for_deletion in mail_addresses:
+			mail_addresses.remove(mail_for_deletion)
+		else:
+			print "Not a mail address of user %s" % user.username()
+			sys.exit(1)
+	user.set_mail_addresses(mail_addresses)
+	user.update()
+	
+elif arguments['add_mail']:
+	user = my_user_source.get_user(arguments['<username>'])
+	if len(user.check()) <> 0:
+		print "There are errors with this user. Please repair first."
+		sys.exit(1)
+	if arguments['<mail>'] is None:
+		address = raw_input('Mail address to add: ')
+		new_addresses = []
+		while address <> '':
+			new_addresses.append(address)
+			address = raw_input('Additional mail address (leave empty for none): ')
+	else:
+		 new_addresses = [arguments['<mail>']]
+	if len(new_addresses) == 0:
+		print "No address provided."
+		sys.exit(1)
+	existing_addresses = user.mail_addresses()
+	existing_addresses.extend(new_addresses)
+	user.set_mail_addresses(existing_addresses)
+	user.update()		
+	
+elif arguments['batch'] or arguments['batch_import']:
+	f = open(arguments['<file>'])
+	dataMap = yaml.safe_load(f)
+	f.close()
+	
+	for user in dataMap:
+		print "Bearbeite User: %s" % user['username']
+		if my_user_source.get_user(user['username']) is not None:
+			print "User existiert bereits, mache nichts."
+		else:
+			my_user_source.add_user(user['username'], user['password'], user['email'], user['firstname'], user['lastname'], user['addresses'])
+		if arguments['batch_import']:
+			try:
+				subprocess.call(['/usr/sbin/sogo-tool', 'restore', os.path.normpath(arguments['<folder>']), user['username']])
+			except:
+				print "Konnte die Daten des Benutzers %s nicht wiederherstellen." % user['username']
+			try:
+				subprocess.call(['/usr/sbin/sogo-tool', 'restore', '-p', os.path.normpath(arguments['<folder>']), user['username']])
+			except:
+				print "Konnte die Einstellungen des Benutzers %s nicht wiederherstellen." % user['username']
+
+# TODO:
+#   - dump_users -> yaml fuer batch
+#   - backup -> dump_users plus sogo-tool backup fuer jeden User -> tarball.
+
+#	try:
+#		ldap_entry = l.search_s(sogo_base_dn, searchScope, "cn="+user['username'], retrieveAttributes)
+#		if len(ldap_entry) == 0:
+#			print "User %s does not exist" % user['username']
+#			subprocess.call(['/usr/bin/samba-tool', 'user', 'add', user['username'], user['password']])
+#		else:
+#			ldap_user = ldap_entry[0][1]
+#			if not ldap_user.has_key('mailNickname'):
+#				print "User %s is not a exchange user" % user['username']
+#				subprocess.call(['/usr/sbin/openchange_newuser', '--create', user['username']])
+#	except ldap.LDAPError, e:
+#		print(e)
+
+# 1. Get Users (von Kommandozeile, File, Webanfrage, ...)
+# 2. Per User:
+#   3. Check if exists -> create
+#   4. Check if openchange -> provision
+#   5. Check if ldap is consistent -> repair
+#   6. Update ldap with information

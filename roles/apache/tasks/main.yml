@@ -1,0 +1,74 @@
+- name: Install apache packages
+  apt: package={{  item  }} state=present
+  with_items:
+    - apache2
+    - apache2-utils
+    - libapache2-mod-wsgi
+  tags: apache
+
+- name: Edit apache security options
+  copy: src=security dest=/etc/apache2/conf.d/security
+  tags: apache
+  notify:
+    - restart apache
+
+- name: Enable apache modules (load)
+  file: src=/etc/apache2/mods-available/{{  item  }}.load dest=/etc/apache2/mods-enabled/{{ item  }}.load state=link
+  when: apache_modules is defined
+  with_items: apache_modules
+  notify:
+    - restart apache
+  tags: apache
+
+- name: Enable apache modules (conf)
+  file: src=/etc/apache2/mods-available/{{  item  }}.conf dest=/etc/apache2/mods-enabled/{{ item  }}.conf state=link force=yes
+  with_items: apache_conf_modules
+  when: apache_conf_modules is defined
+  notify:
+    - restart apache
+  tags: apache
+
+- name: Disable apache modules (load)
+  file: path=/etc/apache2/mods-enabled/{{  item  }}.load state=absent
+  with_items: apache_dis_modules
+  when: apache_dis_modules is defined
+  notify:
+    - restart apache
+  tags: apache
+
+- name: Disable apache modules (conf)
+  file: path=/etc/apache2/mods-enabled/{{  item  }}.conf state=absent
+  with_items: apache_dis_modules
+  when: apache_dis_modules is defined
+  notify:
+    - restart apache
+  tags: apache
+
+- name: Enable apache sites
+  file: src=/etc/apache2/sites-available/{{  item  }} dest=/etc/apache2/sites-enabled/{{  item  }} state=link
+  with_items: apache_sites
+  when: apache_sites is defined
+  notify:
+    - restart apache
+  tags: apache
+
+- name: Disable apache sites
+  file: path=/etc/apache2/sites-enabled/{{  item  }} state=absent
+  with_items: apache_dis_sites
+  when: apache_dis_sites is defined
+  notify:
+    - restart apache
+  tags: apache
+
+- name: Configure default SSL-Configuration
+  template: src=default-ssl.j2 dest=/etc/apache2/sites-available/default-ssl
+  notify:
+    - restart apache
+  tags: apache
+
+- name: Activate name based virtual hosts for ssl
+  copy: src=ports.conf dest=/etc/apache2/ports.conf
+  notify:
+    - restart apache
+  tags: apache
+  

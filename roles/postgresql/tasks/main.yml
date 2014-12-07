@@ -1,0 +1,43 @@
+- name: Install postgresql
+  apt: name={{  item  }} state=present
+  with_items:
+    - postgresql
+    - python-psycopg2
+  tags: postgresql
+  register: last_result
+
+- name: Workaround for broken locale - drop pg cluster
+  sudo: yes
+  sudo_user: postgres
+  command: pg_dropcluster --stop 9.1 main
+  when: last_result.changed
+  tags: postgresql
+
+- name: Workaround for broken locale - create pg cluster
+  sudo: yes
+  sudo_user: postgres
+  command: pg_createcluster --locale de_CH.UTF-8 --start 9.1 main
+  when: last_result.changed
+  tags: postgresql
+
+- name: Create postgresql users
+  sudo: yes
+  sudo_user: postgres
+  postgresql_user: user={{  item.name  }} password={{  item.password  }} role_attr_flags={{  item.attributes  }} state=present
+  with_items: pg_users
+  when: pg_users is defined
+  tags: postgresql
+  
+- name: Create postgresql databases
+  sudo: yes
+  sudo_user: postgres
+  postgresql_db: name={{  item.name  }} owner={{  item.owner  }} state=present
+  with_items: pg_databases
+  when: pg_databases is defined
+  tags: postgresql_testing
+  
+- name: Configure postgresql login
+  template: src=pg_hba.conf.j2 dest=/etc/postgresql/9.1/main/pg_hba.conf
+  notify:
+    - restart postgresql
+  tags: postgresql

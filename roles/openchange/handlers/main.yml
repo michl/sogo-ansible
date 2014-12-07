@@ -1,0 +1,5 @@
+- name: restart openchange
+  service: name={{ item }} state=restarted
+  with_items:
+    - samba4
+    - openchange-ocsmanager

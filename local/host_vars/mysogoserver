@@ -1,0 +1,38 @@
+samba_domain: MYDOM
+samba_realm: mydom.local
+samba_adminpass: secret 
+samba_hostname: MYSOGO
+samba_dnsforwarder: 192.168.0.10
+samba_base_dn: dc=mydom,dc=local
+
+sogo_webpage_title: SOGo webmail
+sogo_mail_domain:
+sogo_hostname: mysogoserver.mydom.local
+
+apache_hostnames:
+  - mysogoserver.mydom.local
+  - mysogoserver.example.ch
+  - autodiscover.mydom.local
+  - autodiscover.example.ch
+  
+pg_password_sogo: secret
+
+ext_hostname: mysogoserver.example.ch
+int_hostname: mysogoserver.mydom.local
+mail_hostname: mysogoserver.example.ch
+postmaster: postmaster@example.ch
+dovecot_adminpass: secret
+postfix_virtual_domains:
+  - example.ch
+  - mydom.local
+postfix_mynetworks:
+  - 192.168.0.0/24
+postfix_myorigin: example.ch
+
+ssl_source_path: ssl/mysogoserver
+
+fetchmail_imapport: 993
+fetchmail_imaphost: imap.myhoster.ch
+fetchmail_imapuser: username
+fetchmail_imappass: secret
+fetchmail_enabled: "yes"

@@ -1,0 +1,13 @@
+hosts = 127.0.0.1:389
+dn = cn=Administrator,cn=Users,{{ samba_base_dn }}
+dnpass = {{ samba_adminpass }}
+auth_bind = yes
+tls = no
+deref = never
+ldap_version = 3
+base = cn=Users,{{ samba_base_dn }}
+scope = subtree
+user_attrs = =home=/srv/dovecot,=uid=5000,=gid=5000,maxStorage=quota_rule=*:storage=%\$M,=quota_rule2=Trash:storage=+100M
+user_filter = (&(sAMAccountName=%u)(objectClass=person)(!(userAccountControl=514)))
+pass_filter = (&(sAMAccountName=%u)(objectClass=person)(!(userAccountControl=514)))
+pass_attrs = userPassword=password,sAMAccountName=user

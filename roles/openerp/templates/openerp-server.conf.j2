@@ -1,0 +1,8 @@
+[options]
+admin_passwd = {{  openerp_adminpass  }}
+db_host = {{  pg_host  }}
+db_port = {{  pg_port  }}
+db_user = {{  pg_users[0].name  }}
+db_password = {{ pg_users[0].password }}
+logfile = /var/log/openerp/openerp-server.log
+addons_path = /opt/openerp/prod/addons,/opt/openerp/prod/web/addons

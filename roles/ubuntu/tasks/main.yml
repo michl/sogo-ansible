@@ -1,0 +1,41 @@
+- name: Check apt last update
+  stat: path=/var/cache/apt
+  register: apt_cache_stat
+  tags: dist
+
+- name: Perform apt update and safe upgrade
+  apt: upgrade=safe update_cache=yes
+  when: ansible_date_time.epoch|float - apt_cache_stat.stat.mtime > 60*60*12
+  tags: dist
+
+- name: Install common packages
+  apt: name={{ item }} state=present
+  with_items:
+    - python-software-properties
+    - mc
+    - lynx
+    - htop
+    - vim
+    - tree
+    - screen
+    - tmpreaper
+    - ssl-cert
+  tags: dist,system
+
+- name: Install ntp
+  apt: name=ntp state=present
+  tags: ntp
+
+- name: Configure ntp file
+  template: src=ntp.conf.j2 dest=/etc/ntp.conf
+  tags: ntp
+  notify: restart ntp
+
+- name: Start the ntp service
+  service: name=ntp state=started enabled=true
+  tags: ntp
+
+- name: Configure locale
+  template: src=default_locale.j2 dest=/etc/default/locale
+  tags: system
+  notify: reconfigure locales

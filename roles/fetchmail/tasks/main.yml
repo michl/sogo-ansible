@@ -1,0 +1,19 @@
+- name: Install fetchmail packages
+  apt: pkg=$item state=present
+  with_items:
+    - fetchmail
+  tags: fetchmail
+  
+- name: Deploy fetchmail config
+  template: src=fetchmailrc.j2 dest=/etc/fetchmailrc
+  tags: fetchmail
+  notify: restart fetchmail
+  
+- name: Deploy default/fetchmail
+  template: src=default_fetchmail.j2 dest=/etc/default/fetchmail
+  tags: fetchmail
+  notify: restart fetchmail
+  
+- name: Enable fetchmail daemon
+  service: name=fetchmail state=started enabled=true
+  tags: fetchmail

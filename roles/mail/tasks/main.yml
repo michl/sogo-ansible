@@ -1,0 +1,103 @@
+- name: Install dovecot packages
+  apt: name={{ item }} state=present
+  with_items:
+    - dovecot-common
+    - dovecot-imapd
+    - dovecot-pop3d
+    - dovecot-ldap
+    - dovecot-sieve
+    - dovecot-managesieved
+    - python-passlib
+  tags: mail
+
+- name: Install postfix packages
+  apt: name={{ item }} state=present
+  with_items:
+    - postfix
+    - postfix-ldap
+    - sasl2-bin
+  tags: mail
+
+- name: Create vmail group
+  group: name=vmail state=present gid=5000
+  tags: mail
+
+- name: Create vmail user
+  user: name=vmail group=vmail home=/srv/dovecot shell=/bin/bash uid=5000 state=present
+  tags: mail
+  
+- name: Create users
+  user: name={{  item  }} group={{ item  }} state=present
+  with_items:
+    - postfix
+    - sasl
+  tags: mail
+  
+- name: Add postfix to sasl group
+  user: name=postfix groups=sasl append=yes
+  tags: mail
+
+- name: Create dovecot directories
+  file: path={{ item }} state=directory owner=vmail group=vmail
+  with_items:
+    - /srv/fast/dovecot
+    - /srv/dovecot/users
+    - /srv/dovecot/sieve
+    - /srv/dovecot
+  tags: mail
+
+- name: Create dovecot config
+  template: src=dovecot.conf.j2 dest=/etc/dovecot/dovecot.conf
+  tags: mail
+  notify: restart dovecot
+
+- name: Create dovecot ldap config
+  template: src=dovecot-ldap.conf.j2 dest=/etc/dovecot/dovecot-ldap.conf
+  tags: mail
+
+- name: Create password for dovecot admin user
+  htpasswd: path=/etc/dovecot/master-users name=admin password={{ dovecot_adminpass }} state=present create=yes
+  tags: mail
+  
+- name: Copy quota-warning.sh
+  copy: src=quota-warning.sh dest=/usr/local/bin/quota-warning.sh
+  tags: mail
+  
+- name: Set Permissions for quota-warning.sh
+  file: path=/usr/local/bin/quota-warning.sh mode=755
+  tags: mail
+
+- name: Configure Postfix main.cf
+  template: src=main.cf.j2 dest=/etc/postfix/main.cf
+  tags: mail
+  notify: restart postfix
+  
+- name: Configure Postfix master.cf
+  lineinfile: dest=/etc/postfix/master.cf regexp='^dovecot ' insertafter=EOF state=present line="dovecot    unix -       n       n       -       -       pipe   flags=DRhu user=vmail:vmail argv=/usr/lib/dovecot/deliver -d \${user}"
+  tags: mail
+  notify: restart postfix
+  
+- name: Configure Postfix virtual transport.ldap
+  template: src=transport.ldap.j2 dest=/etc/postfix/transport.ldap
+  tags: mail
+  notify: restart postfix
+  
+- name: Configure Postfix virtual aliases.ldap
+  template: src=aliases.ldap.j2 dest=/etc/postfix/aliases.ldap
+  tags: mail
+  notify: restart postfix
+  
+- name: Configure Postfix mailname
+  copy: content={{  mail_hostname  }} dest=/etc/mailname
+  tags: mail
+  notify: restart postfix
+  
+- name: Configure saslauthd default/saslauthd
+  copy: src=default_saslauthd dest=/etc/default/saslauthd
+  notify: restart saslauthd
+  tags: mail
+  
+- name: Configure saslauthd.conf
+  template: src=saslauthd.conf.j2 dest=/etc/saslauthd.conf
+  notify: restart saslauthd
+  tags: mail
